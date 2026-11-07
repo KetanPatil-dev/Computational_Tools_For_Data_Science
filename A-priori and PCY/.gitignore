@@ -1,0 +1,8 @@
+# Raw Instacart CSVs are too large for GitHub (see README)
+data/*.csv
+# Basket cache written by load_baskets (161 MB, rebuilt automatically)
+data/derived/*_baskets.npz
+!data/derived/sample_baskets.npz
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store
