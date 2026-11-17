@@ -3,6 +3,8 @@ data/*.csv
 # Basket cache written by load_baskets (161 MB, rebuilt automatically)
 data/derived/*_baskets.npz
 !data/derived/sample_baskets.npz
+data/derived/lightgbm_*.csv
+data/derived/lightgbm_model.txt
 __pycache__/
 .ipynb_checkpoints/
 .DS_Store
