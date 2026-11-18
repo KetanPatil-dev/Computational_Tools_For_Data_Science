@@ -1,12 +1,16 @@
-# A-Priori and PCY on Instacart baskets
+# Mining, clustering and recommendation on Instacart baskets
 
 Frequent-itemset mining on 3.2M real grocery baskets from the Instacart Online Grocery Shopping Dataset 2017, and a next-basket recommender built from the mined association rules.
 A-Priori and PCY are our own implementations, compiled with numba.
+LightGBM adds a supervised next-basket recommender using the LightGBM library.
 
-This folder covers two parts of a larger project:
+The notebooks cover five parts of the project:
 
 - **Data preparation and A-Priori** (`notebooks/01_data_apriori.ipynb`)
 - **PCY, association rules and the rule-based recommender** (`notebooks/02_pcy_rules_recommender.ipynb`)
+- **Spectral clustering** (`notebooks/03_spectral_clustering copy.ipynb`)
+- **Louvain communities** (`notebooks/04_louvain.ipynb`)
+- **LightGBM next-basket recommender** (`notebooks/05_lightgbm_recommender.ipynb`)
 
 ## Results
 
@@ -33,6 +37,13 @@ This folder covers two parts of a larger project:
 **Rule-based recommender**
 - Tuned on the validation users, then evaluated once on the 65,444 test users.
 - Hit-rate@10 is 50.6% and precision@10 is 0.085.
+
+**LightGBM recommender**
+- Prior-order purchase frequency, recency, user history, product popularity and product categories predict whether a candidate appears in the next order.
+- Uses the saved user split and the same top-10 evaluation metrics as the rule recommender. Candidates are previously purchased products plus the 20 most popular training-history products.
+- On the 65,444 test users, hit-rate@10 is **87.07%**, precision@10 is **0.2990** and recall@10 is **0.3542**. The training-history popularity baseline reaches 45.82% hit-rate@10; the saved association-rule predictions reach 50.62%.
+- Validation selects 31 leaves and 500 boosting rounds (the configured maximum). Test candidate recall is 0.6234, with a candidate hit-rate ceiling of 94.42%.
+- The full run took about 2.5 minutes on this machine. Notebook 05 includes the saved outputs; data provenance and run settings are recorded in `data/derived/instacart_source.json` and `data/derived/lightgbm_run.json`.
 
 **Same basket ≠ next basket**
 - Take a rule with confidence above 0.3 whose consequent is new to the user. That product appears in the user's next order only 4% of the time.
@@ -62,6 +73,7 @@ Description
 - Association rules with support, confidence and lift.
 - The rule-based recommender.
 - The same-basket vs next-basket analysis.
+- A supervised LightGBM comparison, with validation tuning, feature importance and candidate coverage.
 
 **Extensions beyond the plan**
 - Multistage and Multihash, the two refinements of PCY (`src/pcy.py`).
@@ -71,7 +83,7 @@ Description
 
 The raw CSVs are not in this repository: two of them are larger than GitHub's 100 MB file limit. To get them:
 
-1. Download the data from https://www.kaggle.com/competitions/instacart-market-basket-analysis/data. You need to sign in and accept the competition rules.
+1. Download the public [Instacart Market Basket Analysis dataset on Kaggle](https://www.kaggle.com/datasets/psparks/instacart-market-basket-analysis). The original competition URL is no longer available. This copy can also be downloaded without credentials from `https://www.kaggle.com/api/v1/datasets/download/psparks/instacart-market-basket-analysis`.
 2. Unzip these six files into `data/`:
 
 ```
@@ -81,6 +93,9 @@ data/orders.csv  data/order_products__prior.csv  data/order_products__train.csv
 
 To keep the CSVs somewhere else, set `INSTACART_DATA=/path/to/csvs`.
 
+`data/derived/instacart_source.json` records the download source, archive checksum,
+and verified row counts and SHA-256 checksums of the six CSVs used for the LightGBM run.
+
 `data/derived/` contains these outputs, which the rest of the project can use directly:
 
 | File | Contents |
@@ -89,8 +104,14 @@ To keep the CSVs somewhere else, set `INSTACART_DATA=/path/to/csvs`.
 | `sample_baskets.npz` | 100k baskets for quick development; load with `Baskets(**np.load(...))` |
 | `rules_support_1e-4.csv` | association rules with support, confidence and lift |
 | `rule_recommendations_test.csv` | the rule recommender's top-10 for every test user |
-| `spectral_clusters_k50.csv` | Description |
+| `spectral_clusters_k50.csv` | spectral cluster assignments for the product graph with 50 clusters |
 | `louvain_communities.csv` | the Louvain community of every product in the graph |
+
+Notebook 05 additionally writes `lightgbm_recommendations_test.csv` in the same
+`user_id, rank, product_id` format, `lightgbm_test_metrics.csv`,
+`lightgbm_validation.csv` and `lightgbm_model.txt`. These generated files are ignored by Git.
+`lightgbm_run.json` records the full run's package versions, settings and test metrics.
+The sample basket cache alone cannot be used to train LightGBM: it lacks user histories and next-order labels.
 
 ## Running
 
@@ -99,14 +120,28 @@ pip install -r requirements.txt
 jupyter lab notebooks/
 ```
 
-Run `01` first. It builds and caches the baskets (about 160 MB in `data/derived/`, not committed) and saves the user split. The notebooks are saved with their outputs, so the results can be read without running anything.
+The notebooks include saved outputs. The saved `split.csv` is included, so notebook 05 can be run directly once the raw CSVs are available. Run `01` to rebuild the split and basket cache (about 160 MB in `data/derived/`, not committed).
+
+On macOS, LightGBM also needs OpenMP (`brew install libomp`); see the
+[installation guide](https://lightgbm.readthedocs.io/en/stable/Installation-Guide.html).
 
 | Notebook | Contents | Time |
 |---|---|---|
 | `01_data_apriori` | the six files and integrity checks, descriptive statistics, chunked basket loading, train/validation/test split, A-Priori (toy example, brute-force check, full data), frequent triples | ~1 min |
 | `02_pcy_rules_recommender` | PCY step by step on the toy example, PCY = A-Priori, bucket-size experiment, association rules, rule-based recommender (tuned on validation, evaluated once on test), same-basket vs next-basket analysis | ~6 min |
-| `03_spectral_clustering` | Description | time|
+| `03_spectral_clustering copy` | product graph, spectral clustering, cluster count selection, comparison with product categories | — |
 | `04_louvain` | Louvain on a toy graph and the karate club (checked against networkx), the product graph, levels of the hierarchy, stability over 20 vertex orders, resolution parameter, communities vs. departments and aisles | ~4.5 s |
+| `05_lightgbm_recommender` | feature checks, saved user split, candidate coverage, LightGBM validation tuning, feature importance, test comparison and prediction export | ~2.5 min |
+
+Notebook 05 uses the saved split from 01 and the saved rule predictions from 02 for
+comparison. Training and validation feature frames are held in memory;
+allow several GB of RAM for the full dataset. Test feature construction uses batches of 5,000 users.
+
+Run the LightGBM checks from this folder after installing the requirements:
+
+```bash
+python -m unittest discover -s tests -v
+```
 
 ## Code
 
@@ -117,11 +152,15 @@ Run `01` first. It builds and caches the baskets (about 160 MB in `data/derived/
 | `src/pcy.py` | PCY, Multistage, Multihash |
 | `src/hashcount.py` | open-addressing hash table for sparse pair and triple counts |
 | `src/recommend.py` | rule-based recommender, precision / recall / hit-rate@k |
-| `src/spectral.py` | Description |
+| `src/spectral.py` | product graph, Laplacians, spectral clustering, recursive bipartition |
 | `src/louvain.py` | product graph from the rules, modularity, Louvain (local moves, collapse, levels), community summary |
+| `src/lightgbm_recommender.py` | prior-order features and candidates, binary labels, LightGBM training, top-k ranking |
+| `tests/test_lightgbm_recommender.py` | feature counts, leakage checks, ranking edge cases and synthetic training |
 
 ## Evaluation protocol
 
 - **Ground truth:** for each of the 131,209 users with an order in Instacart's `train` set, that order. Only the users' `prior` orders are used as input.
 - **Split:** users are split at random with a fixed seed into train (40%), validation (10%, for tuning) and test (50%, used once).
 - **Primary metric:** hit-rate@10, the share of users with at least one recommended product in their next order. Precision@10 and recall@10 are also reported.
+- **LightGBM:** product statistics are fitted on training users' prior orders and frozen for validation and test. Each user's own prior history supplies their personal features. Early stopping uses validation log loss; tree size is selected by validation hit-rate@10. The chosen model stays fitted on training users, and all test users are evaluated against their full target baskets, including products outside the candidate set.
+- **History pools:** notebook 02 mines rules from all users' prior baskets; LightGBM's product statistics and its popularity baseline use training users' prior baskets. The comparison shares users and targets but has this difference in global history inputs.

@@ -1,0 +1,52 @@
+{
+  "run_date": "2026-11-17",
+  "notebook": "notebooks/05_lightgbm_recommender.ipynb",
+  "source_manifest": "data/derived/instacart_source.json",
+  "elapsed_seconds": 149.8,
+  "python": "3.11.13",
+  "packages": {
+    "lightgbm": "4.7.0",
+    "scikit-learn": "1.8.0",
+    "numpy": "2.3.3",
+    "pandas": "3.0.2",
+    "matplotlib": "3.10.7"
+  },
+  "users": {
+    "test": 65444,
+    "train": 52397,
+    "validation": 13368
+  },
+  "seed": 0,
+  "k": 10,
+  "n_popular": 20,
+  "selected_num_leaves": 31,
+  "selected_iteration": 500,
+  "max_estimators": 500,
+  "early_stopping_rounds": 30,
+  "training_validation_feature_MB": 318.3,
+  "test_candidate_recall": 0.623427,
+  "test_candidate_hit_rate": 0.944227,
+  "test_metrics": [
+    {
+      "model": "Popularity (training history)",
+      "precision@10": 0.0726942118452417,
+      "recall@10": 0.069878435687849,
+      "hit_rate@10": 0.4581779842307927,
+      "users": 65444
+    },
+    {
+      "model": "LightGBM",
+      "precision@10": 0.299029704785771,
+      "recall@10": 0.3541590912799153,
+      "hit_rate@10": 0.8706527718354624,
+      "users": 65444
+    },
+    {
+      "model": "Association rules (notebook 02)",
+      "precision@10": 0.0848695067538659,
+      "recall@10": 0.0874193429593524,
+      "hit_rate@10": 0.5062037772752277,
+      "users": 65444
+    }
+  ]
+}
