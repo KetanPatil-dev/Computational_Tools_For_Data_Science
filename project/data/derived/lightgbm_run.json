@@ -1,6 +1,6 @@
 {
   "run_date": "2026-11-17",
-  "notebook": "notebooks/03_lightgbm_recommender.ipynb",
+  "notebook": "notebooks/05_lightgbm_recommender.ipynb",
   "source_manifest": "data/derived/instacart_source.json",
   "elapsed_seconds": 149.8,
   "python": "3.11.13",

@@ -1,14 +1,16 @@
-# A-Priori, PCY and LightGBM on Instacart baskets
+# Mining, clustering and recommendation on Instacart baskets
 
 Frequent-itemset mining on 3.2M real grocery baskets from the Instacart Online Grocery Shopping Dataset 2017, and a next-basket recommender built from the mined association rules.
 A-Priori and PCY are our own implementations, compiled with numba.
 LightGBM adds a supervised next-basket recommender using the LightGBM library.
 
-This folder covers three parts of a larger project:
+The notebooks cover five parts of the project:
 
 - **Data preparation and A-Priori** (`notebooks/01_data_apriori.ipynb`)
 - **PCY, association rules and the rule-based recommender** (`notebooks/02_pcy_rules_recommender.ipynb`)
-- **LightGBM next-basket recommender** (`notebooks/03_lightgbm_recommender.ipynb`)
+- **Spectral clustering** (`notebooks/03_spectral_clustering copy.ipynb`)
+- **Louvain communities** (`notebooks/04_louvain.ipynb`)
+- **LightGBM next-basket recommender** (`notebooks/05_lightgbm_recommender.ipynb`)
 
 ## Results
 
@@ -41,12 +43,23 @@ This folder covers three parts of a larger project:
 - Uses the saved user split and the same top-10 evaluation metrics as the rule recommender. Candidates are previously purchased products plus the 20 most popular training-history products.
 - On the 65,444 test users, hit-rate@10 is **87.07%**, precision@10 is **0.2990** and recall@10 is **0.3542**. The training-history popularity baseline reaches 45.82% hit-rate@10; the saved association-rule predictions reach 50.62%.
 - Validation selects 31 leaves and 500 boosting rounds (the configured maximum). Test candidate recall is 0.6234, with a candidate hit-rate ceiling of 94.42%.
-- The full run took about 2.5 minutes on this machine. Notebook 03 includes the saved outputs; data provenance and run settings are recorded in `data/derived/instacart_source.json` and `data/derived/lightgbm_run.json`.
+- The full run took about 2.5 minutes on this machine. Notebook 05 includes the saved outputs; data provenance and run settings are recorded in `data/derived/instacart_source.json` and `data/derived/lightgbm_run.json`.
 
 **Same basket ≠ next basket**
 - Take a rule with confidence above 0.3 whose consequent is new to the user. That product appears in the user's next order only 4% of the time.
 - If the user has bought the product before, the rate is 41%.
 - So a rule's confidence measures the same basket, not the next one.
+
+**Spectral clustering**
+Description
+
+**Louvain**
+- Our own implementation: moving single vertices by modularity gain, then collapsing every community into one vertex. It is checked by hand on a small graph and against networkx on the karate club.
+- It runs on the same product graph as the spectral clustering: 3,634 products, edges with lift above 1 weighted by log(lift), keeping the 10 strongest edges of each product.
+- 3 passes give 251, 72 and finally 64 communities, with modularity 0.69 (networkx: 0.687 with 68).
+- About 1,720 products end up in one large community around the most popular items (bananas, strawberries, avocados). Only 20 of the 64 communities have 10 products or more.
+- The result depends on the order of the vertices. Over 20 random orders, modularity stays between 0.684 and 0.690, but the number of communities goes from 59 to 74 and two runs agree with an ARI of 0.87 on average.
+- Agreement with the real categories is weak but not random: AMI 0.16 with departments and 0.17 with aisles, against 0.00 for shuffled labels. The clear communities are product lines and shopping missions (one brand's yogurts, ice cream, sparkling waters, energy bars, baby food, kombucha), not departments.
 
 ## What is included
 
@@ -91,8 +104,10 @@ and verified row counts and SHA-256 checksums of the six CSVs used for the Light
 | `sample_baskets.npz` | 100k baskets for quick development; load with `Baskets(**np.load(...))` |
 | `rules_support_1e-4.csv` | association rules with support, confidence and lift |
 | `rule_recommendations_test.csv` | the rule recommender's top-10 for every test user |
+| `spectral_clusters_k50.csv` | spectral cluster assignments for the product graph with 50 clusters |
+| `louvain_communities.csv` | the Louvain community of every product in the graph |
 
-Notebook 03 additionally writes `lightgbm_recommendations_test.csv` in the same
+Notebook 05 additionally writes `lightgbm_recommendations_test.csv` in the same
 `user_id, rank, product_id` format, `lightgbm_test_metrics.csv`,
 `lightgbm_validation.csv` and `lightgbm_model.txt`. These generated files are ignored by Git.
 `lightgbm_run.json` records the full run's package versions, settings and test metrics.
@@ -105,7 +120,7 @@ pip install -r requirements.txt
 jupyter lab notebooks/
 ```
 
-All three notebooks have saved outputs. The saved `split.csv` is included, so notebook 03 can be run directly once the raw CSVs are available. Run `01` to rebuild the split and basket cache (about 160 MB in `data/derived/`, not committed).
+The notebooks include saved outputs. The saved `split.csv` is included, so notebook 05 can be run directly once the raw CSVs are available. Run `01` to rebuild the split and basket cache (about 160 MB in `data/derived/`, not committed).
 
 On macOS, LightGBM also needs OpenMP (`brew install libomp`); see the
 [installation guide](https://lightgbm.readthedocs.io/en/stable/Installation-Guide.html).
@@ -114,10 +129,12 @@ On macOS, LightGBM also needs OpenMP (`brew install libomp`); see the
 |---|---|---|
 | `01_data_apriori` | the six files and integrity checks, descriptive statistics, chunked basket loading, train/validation/test split, A-Priori (toy example, brute-force check, full data), frequent triples | ~1 min |
 | `02_pcy_rules_recommender` | PCY step by step on the toy example, PCY = A-Priori, bucket-size experiment, association rules, rule-based recommender (tuned on validation, evaluated once on test), same-basket vs next-basket analysis | ~6 min |
-| `03_lightgbm_recommender` | feature checks, saved user split, candidate coverage, LightGBM validation tuning, feature importance, test comparison and prediction export | ~2.5 min |
+| `03_spectral_clustering copy` | product graph, spectral clustering, cluster count selection, comparison with product categories | — |
+| `04_louvain` | Louvain on a toy graph and the karate club (checked against networkx), the product graph, levels of the hierarchy, stability over 20 vertex orders, resolution parameter, communities vs. departments and aisles | ~4.5 s |
+| `05_lightgbm_recommender` | feature checks, saved user split, candidate coverage, LightGBM validation tuning, feature importance, test comparison and prediction export | ~2.5 min |
 
-Notebook 03 needs 01's split; running 02 is optional and adds the saved rule predictions
-to its final comparison. Training and validation feature frames are held in memory;
+Notebook 05 uses the saved split from 01 and the saved rule predictions from 02 for
+comparison. Training and validation feature frames are held in memory;
 allow several GB of RAM for the full dataset. Test feature construction uses batches of 5,000 users.
 
 Run the LightGBM checks from this folder after installing the requirements:
@@ -135,6 +152,8 @@ python -m unittest discover -s tests -v
 | `src/pcy.py` | PCY, Multistage, Multihash |
 | `src/hashcount.py` | open-addressing hash table for sparse pair and triple counts |
 | `src/recommend.py` | rule-based recommender, precision / recall / hit-rate@k |
+| `src/spectral.py` | product graph, Laplacians, spectral clustering, recursive bipartition |
+| `src/louvain.py` | product graph from the rules, modularity, Louvain (local moves, collapse, levels), community summary |
 | `src/lightgbm_recommender.py` | prior-order features and candidates, binary labels, LightGBM training, top-k ranking |
 | `tests/test_lightgbm_recommender.py` | feature counts, leakage checks, ranking edge cases and synthetic training |
 
