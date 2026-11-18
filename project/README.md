@@ -39,6 +39,17 @@ This folder covers two parts of a larger project:
 - If the user has bought the product before, the rate is 41%.
 - So a rule's confidence measures the same basket, not the next one.
 
+**Spectral clustering**
+Description
+
+**Louvain**
+- Our own implementation: moving single vertices by modularity gain, then collapsing every community into one vertex. It is checked by hand on a small graph and against networkx on the karate club.
+- It runs on the same product graph as the spectral clustering: 3,634 products, edges with lift above 1 weighted by log(lift), keeping the 10 strongest edges of each product.
+- 3 passes give 251, 72 and finally 64 communities, with modularity 0.69 (networkx: 0.687 with 68).
+- About 1,720 products end up in one large community around the most popular items (bananas, strawberries, avocados). Only 20 of the 64 communities have 10 products or more.
+- The result depends on the order of the vertices. Over 20 random orders, modularity stays between 0.684 and 0.690, but the number of communities goes from 59 to 74 and two runs agree with an ARI of 0.87 on average.
+- Agreement with the real categories is weak but not random: AMI 0.16 with departments and 0.17 with aisles, against 0.00 for shuffled labels. The clear communities are product lines and shopping missions (one brand's yogurts, ice cream, sparkling waters, energy bars, baby food, kombucha), not departments.
+
 ## What is included
 
 **Planned work**
@@ -78,6 +89,8 @@ To keep the CSVs somewhere else, set `INSTACART_DATA=/path/to/csvs`.
 | `sample_baskets.npz` | 100k baskets for quick development; load with `Baskets(**np.load(...))` |
 | `rules_support_1e-4.csv` | association rules with support, confidence and lift |
 | `rule_recommendations_test.csv` | the rule recommender's top-10 for every test user |
+| `spectral_clusters_k50.csv` | Description |
+| `louvain_communities.csv` | the Louvain community of every product in the graph |
 
 ## Running
 
@@ -92,6 +105,8 @@ Run `01` first. It builds and caches the baskets (about 160 MB in `data/derived/
 |---|---|---|
 | `01_data_apriori` | the six files and integrity checks, descriptive statistics, chunked basket loading, train/validation/test split, A-Priori (toy example, brute-force check, full data), frequent triples | ~1 min |
 | `02_pcy_rules_recommender` | PCY step by step on the toy example, PCY = A-Priori, bucket-size experiment, association rules, rule-based recommender (tuned on validation, evaluated once on test), same-basket vs next-basket analysis | ~6 min |
+| `03_spectral_clustering` | Description | time|
+| `04_louvain` | Louvain on a toy graph and the karate club (checked against networkx), the product graph, levels of the hierarchy, stability over 20 vertex orders, resolution parameter, communities vs. departments and aisles | ~4.5 s |
 
 ## Code
 
@@ -102,6 +117,8 @@ Run `01` first. It builds and caches the baskets (about 160 MB in `data/derived/
 | `src/pcy.py` | PCY, Multistage, Multihash |
 | `src/hashcount.py` | open-addressing hash table for sparse pair and triple counts |
 | `src/recommend.py` | rule-based recommender, precision / recall / hit-rate@k |
+| `src/spectral.py` | Description |
+| `src/louvain.py` | product graph from the rules, modularity, Louvain (local moves, collapse, levels), community summary |
 
 ## Evaluation protocol
 
